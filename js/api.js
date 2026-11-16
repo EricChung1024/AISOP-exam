@@ -47,3 +47,16 @@ export async function select(table, opts = {}) {
   if (error) throw new Error(error.message);
   return data;
 }
+
+/** 呼叫 Supabase Edge Function；失敗時丟帶 .code 的 Error（函式回 {error: 代碼}）。 */
+export async function callFn(name, body = {}) {
+  const { data, error } = await sb.functions.invoke(name, { body });
+  if (error) {
+    let code = 'FUNCTION_FAILED';
+    try { const j = await error.context.json(); if (j?.error) code = j.error; } catch { /* 沒有回應內容 */ }
+    const e = new Error(code);
+    e.code = code;
+    throw e;
+  }
+  return data;
+}

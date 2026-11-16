@@ -16,7 +16,7 @@
 <script type="module">
 import { requireRole } from './js/guard.js';
 import { renderNav, h, showError, setBusy } from './js/ui.js';
-import { select, rpc } from './js/api.js';
+import { select, rpc, callFn } from './js/api.js';
 import { stageLabel, fmtDate, errorTypeCounts, dueStatus } from './js/format.js';
 import { renderErrorBars } from './js/report.js';
 
@@ -72,6 +72,14 @@ async function load() {
         h('p', { class: `due ${pDue.level}` }, `試用期考核：${pDue.label}`),
         h('p', { class: `due ${sDue.level}` }, `半年考核：${sDue.label}`),
         h('p', { class: 'muted' }, `期限日期：試用期 ${st.probation_due || '—'}（到職日＋3 個月）・半年考核 ${st.semiannual_due || '—'}`)),
+      h('h2', {}, '帳號'),
+      h('div', { class: 'row' }, h('button', { class: 'btn ghost', id: 'reset-pw', onclick: async () => {
+        if (!confirm('確定要重設這位員工的密碼嗎？舊密碼會立刻失效。')) return;
+        try {
+          const r = await callFn('create-employees', { action: 'reset_password', user_id: uid });
+          msg.replaceChildren(h('div', { class: 'notice ok' }, '新的初始密碼（只會顯示這一次）：', h('code', { class: 'new-password', style: 'font-size:1.1rem' }, r.password)));
+        } catch (e) { showError(msg, e); }
+      } }, '重設密碼')),
       h('h2', {}, '歷次成績'),
       attempts.length
         ? h('table', { class: 'attempts' },

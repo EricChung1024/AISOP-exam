@@ -13,14 +13,16 @@
   <div class="tabs" role="tablist">
     <button class="btn" id="tab-overview" role="tab">員工總覽</button>
     <button class="btn ghost" id="tab-review" role="tab">題庫審核</button>
+    <button class="btn ghost" id="tab-add" role="tab">新增員工</button>
   </div>
   <div id="panel"></div>
 </main>
 <script type="module">
 import { requireRole } from './js/guard.js';
 import { renderNav, h, showError, setBusy } from './js/ui.js';
-import { select, rpc } from './js/api.js';
-import { stageShort, stageLabel, errorTypeCounts, dueStatus } from './js/format.js';
+import { select, rpc, callFn } from './js/api.js';
+import { stageShort, stageLabel, errorTypeCounts, dueStatus, createErrorLabel } from './js/format.js';
+import { parseRoster } from './js/roster.js';
 import { renderErrorBars } from './js/report.js';
 
 const me = await requireRole('supervisor');
@@ -28,13 +30,16 @@ renderNav(me, 'supervisor.html');
 const panel = document.getElementById('panel');
 const tabOverview = document.getElementById('tab-overview');
 const tabReview = document.getElementById('tab-review');
+const tabAdd = document.getElementById('tab-add');
 const STAGES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 10, 11];
 
 function activate(which) {
   tabOverview.className = `btn ${which === 'overview' ? '' : 'ghost'}`;
   tabReview.className = `btn ${which === 'review' ? '' : 'ghost'}`;
+  tabAdd.className = `btn ${which === 'add' ? '' : 'ghost'}`;
   tabOverview.setAttribute('aria-selected', which === 'overview');
   tabReview.setAttribute('aria-selected', which === 'review');
+  tabAdd.setAttribute('aria-selected', which === 'add');
 }
 
 async function showOverview() {
@@ -126,6 +131,53 @@ async function showReview() {
   await load();
 }
 
+async function showAdd() {
+  activate('add');
+  const ta = h('textarea', { id: 'roster', 'aria-label': '員工名單', style: 'min-height:180px',
+    placeholder: '一行一位：姓名,信箱\n例如：\n陳宥廷,chen@example.com\n林小美,mei@example.com\n（也可以直接從 Excel 貼上姓名、信箱兩欄）' });
+  const errBox = h('div', { class: 'roster-errors', 'aria-live': 'polite' });
+  const out = h('div', {});
+  const btn = h('button', { class: 'btn', id: 'create' }, '建立帳號');
+  panel.replaceChildren(
+    h('p', { class: 'muted' }, '貼上要建立的員工名單，系統會替每人建立帳號並產生一組初始密碼。新帳號一律是「員工」身分。'),
+    ta, h('p', {}, btn), errBox, out);
+
+  function renderResults(results) {
+    const okRows = results.filter((r) => r.ok);
+    const csv = '\uFEFF姓名,信箱,初始密碼\n' + okRows.map((r) => `${r.name},${r.email},${r.password}`).join('\n') + '\n';
+    const copy = h('button', { class: 'btn ghost', id: 'copy-all', onclick: async () => {
+      try { await navigator.clipboard.writeText(okRows.map((r) => `${r.name}\t${r.email}\t${r.password}`).join('\n')); copy.textContent = '已複製'; }
+      catch { copy.textContent = '複製失敗，請改用下載'; }
+    } }, '複製全部');
+    const dl = h('a', { class: 'btn ghost', id: 'download-csv', download: '新增員工密碼.csv',
+      href: URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' })) }, '下載 CSV');
+    out.replaceChildren(
+      h('p', { class: 'notice warn' }, `建立成功 ${okRows.length} 位，未建立 ${results.length - okRows.length} 位。初始密碼只會顯示這一次，請立刻複製或下載並交給員工；之後只能重設。`),
+      h('table', { class: 'created' },
+        h('thead', {}, h('tr', {}, ['姓名', '信箱', '初始密碼', '結果'].map((t) => h('th', {}, t)))),
+        h('tbody', {}, results.map((r) => h('tr', {},
+          h('td', {}, r.name), h('td', {}, r.email),
+          h('td', { class: 'pw', style: 'font-family:monospace' }, r.ok ? r.password : '—'),
+          h('td', { class: r.ok ? 'cell-ok' : 'cell-bad' }, r.ok ? '已建立' : createErrorLabel(r.error)))))),
+      okRows.length ? h('p', { class: 'row' }, copy, dl) : null);
+  }
+
+  btn.addEventListener('click', async () => {
+    const { users, errors } = parseRoster(ta.value);
+    errBox.replaceChildren(errors.length
+      ? h('div', { class: 'notice warn' }, h('strong', {}, '這些行無法使用，已略過：'),
+          h('ul', {}, errors.map((e) => h('li', {}, `第 ${e.line} 行「${e.text}」：${e.reason}`))))
+      : h('span', {}));
+    if (!users.length) { out.replaceChildren(h('p', { class: 'notice warn' }, '沒有可以建立的員工。')); return; }
+    btn.disabled = true;
+    out.replaceChildren(h('p', { class: 'muted' }, '建立中…'));
+    try { renderResults((await callFn('create-employees', { action: 'create', users })).results); }
+    catch (e) { showError(out, e); }
+    finally { btn.disabled = false; }
+  });
+}
+
+tabAdd.addEventListener('click', showAdd);
 tabOverview.addEventListener('click', showOverview);
 tabReview.addEventListener('click', showReview);
 await showOverview();

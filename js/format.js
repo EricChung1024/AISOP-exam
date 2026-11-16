@@ -57,6 +57,11 @@ const MESSAGES = {
   BAD_STAGE: '階段不正確。',
   BAD_STATUS: '狀態不正確。',
   NOT_FOUND: '找不到對應的資料。',
+  TOO_MANY: '一次最多建立 200 位員工。',
+  BAD_REQUEST: '資料格式不正確。',
+  NOT_EMPLOYEE: '只能重設員工的密碼。',
+  RESET_FAILED: '重設密碼失敗，請稍後再試。',
+  FUNCTION_FAILED: '伺服器功能暫時無法使用，請稍後再試。',
 };
 
 export function errorMessage(code) {
@@ -82,4 +87,17 @@ export function dueStatus(due, passed, today = new Date()) {
   if (days === 0) return { label: `今天到期（${due}）`, level: 'soon' };
   if (days <= 30) return { label: `剩 ${days} 天（${due}）`, level: 'soon' };
   return { label: `期限 ${due}`, level: 'ok' };
+}
+
+const CREATE_LABELS = {
+  ALREADY_EXISTS: '已有帳號（未更動）',
+  DUPLICATE: '名單中信箱重複',
+  BAD_EMAIL: '信箱格式不正確',
+  BAD_NAME: '姓名不正確（1–40 字）',
+  CREATE_FAILED: '建立失敗',
+};
+
+/** 新增員工時，單一列失敗原因的中文說明。 */
+export function createErrorLabel(code) {
+  return CREATE_LABELS[code] || `失敗（${code}）`;
 }

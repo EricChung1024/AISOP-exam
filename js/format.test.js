@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { errorTypeCounts, stageLabel, stageShort, statusOf, esc, errorMessage, fmtDate, dueStatus } from './format.js';
+import { errorTypeCounts, stageLabel, stageShort, statusOf, esc, errorMessage, fmtDate, dueStatus, createErrorLabel } from './format.js';
 
 test('errorTypeCounts counts rows and sorts by count desc then name', () => {
   const rows = ['B', 'A', 'C', 'B', 'A', 'A'].map((error_type) => ({ error_type }));
@@ -75,4 +75,19 @@ test('dueStatus reports passed, missing hire date, overdue, soon and ok', () => 
   assert.deepEqual(dueStatus('2026-11-26', false, today), { label: '剩 10 天（2026-11-26）', level: 'soon' });
   assert.deepEqual(dueStatus('2027-03-01', false, today), { label: '期限 2027-03-01', level: 'ok' });
   assert.deepEqual(dueStatus('2026-11-16', false, today), { label: '今天到期（2026-11-16）', level: 'soon' });
+});
+
+test('createErrorLabel explains each way a new account can fail', () => {
+  assert.match(createErrorLabel('ALREADY_EXISTS'), /已有帳號/);
+  assert.match(createErrorLabel('DUPLICATE'), /重複/);
+  assert.match(createErrorLabel('BAD_EMAIL'), /信箱/);
+  assert.match(createErrorLabel('BAD_NAME'), /姓名/);
+  assert.match(createErrorLabel('CREATE_FAILED'), /失敗/);
+  assert.match(createErrorLabel('SOMETHING'), /SOMETHING/);
+});
+
+test('errorMessage covers the account-management codes', () => {
+  assert.match(errorMessage('TOO_MANY'), /200/);
+  assert.match(errorMessage('NOT_EMPLOYEE'), /員工/);
+  assert.match(errorMessage('FUNCTION_FAILED'), /稍後/);
 });
