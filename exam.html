@@ -3,11 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>適任考核系統｜考試</title>
+<title>考核系統｜考試｜巷口服務所</title>
 <link rel="stylesheet" href="css/app.css">
 </head>
 <body>
 <main>
+  <p class="cap">第 2 格・作答中</p>
   <h1 id="title">考試</h1>
   <div id="app"></div>
 </main>
@@ -75,7 +76,7 @@ function renderExam(exam) {
             onchange: () => { ans.set(q.id, { question_id: q.id, choice: i }); drawNav(); } }),
           h('span', {}, text))));
     box.replaceChildren(
-      h('div', { class: 'card' },
+      h('div', { class: 'card panel' },
         h('p', { class: 'muted' }, `第 ${cur + 1} / ${qs.length} 題${q.qtype === 'short' ? '（情境簡答，需自評）' : ''}`),
         h('p', { class: 'stem' }, q.stem), input),
       h('div', { class: 'row', style: 'margin-top:12px' },

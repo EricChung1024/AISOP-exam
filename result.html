@@ -3,11 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>適任考核系統｜成績</title>
+<title>考核系統｜成績｜巷口服務所</title>
 <link rel="stylesheet" href="css/app.css">
 </head>
 <body>
 <main>
+  <p class="cap">第 3 格・考試結果</p>
   <h1>考試結果</h1>
   <div id="app"></div>
 </main>
@@ -28,9 +29,10 @@ if (!saved) {
 } else {
   const r = JSON.parse(saved);
   app.replaceChildren(
-    h('div', { class: 'card' },
+    h('div', { class: 'card panel' },
       h('p', { class: 'score', style: 'font-size:1.6rem;margin:0' }, `得分 ${r.score} 分`),
-      h('p', {}, h('span', { class: `badge ${r.passed ? 'ok' : 'bad'}` }, `${r.passed ? '已通過' : '未通過'}（${r.pass_score ?? 80} 分及格）`))),
+      h('p', { class: 'row' }, h('span', { class: `badge ${r.passed ? 'ok' : 'bad'}` }, `${r.passed ? '已通過' : '未通過'}（${r.pass_score ?? 80} 分及格）`),
+        r.passed ? h('span', { class: 'stamp', 'aria-hidden': 'true' }, '合格') : null)),
     renderReport(r.items),
     h('p', { class: 'row' },
       h('a', { class: 'btn', href: 'wrong.html' }, '去錯題區檢討'),

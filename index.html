@@ -3,14 +3,16 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>適任考核系統｜登入</title>
+<title>考核系統｜登入｜巷口服務所</title>
 <link rel="stylesheet" href="css/app.css">
 </head>
 <body>
+<div class="awning" aria-hidden="true"></div>
 <main>
-  <h1>適任考核系統</h1>
+  <div class="brand-hero"><span id="logo"></span><div><div class="wordmark">巷口服務所</div><p class="cap">歡迎光臨</p></div></div>
+  <h1>考核系統</h1>
   <div id="setup"></div>
-  <form id="login" class="card" style="max-width:420px" novalidate>
+  <form id="login" class="card panel" style="max-width:440px" novalidate>
     <label for="email">信箱</label>
     <input id="email" type="email" autocomplete="username" required>
     <label for="password">密碼</label>
@@ -22,7 +24,10 @@
 </main>
 <script type="module">
 import { isConfigured } from './js/config.js';
-import { h } from './js/ui.js';
+import { h, brandMark, renderFooter } from './js/ui.js';
+
+document.getElementById('logo').append(brandMark(64));
+renderFooter();
 
 const msg = document.getElementById('msg');
 if (!isConfigured()) {
