@@ -115,3 +115,10 @@ th { background: var(--gold-light); font-family: var(--font-display); font-weigh
 }
 @media (prefers-reduced-motion: reduce) { .btn, .stamp { animation: none !important; transition: none !important; } }
 .option strong { white-space: nowrap; margin-left: auto; padding-left: var(--space-3); }
+
+/* 登入頁：內容水平置中 */
+.login-page { display: flex; flex-direction: column; align-items: center; text-align: center; }
+.login-page form { text-align: left; }
+.login-page .brand-hero { justify-content: center; text-align: left; }
+.login-page #setup { width: 100%; max-width: 440px; }
+.login-page ~ footer.note { text-align: center; }
