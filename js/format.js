@@ -19,7 +19,8 @@ export const STAGE_NAMES = {
 
 // 到職後依年資自動變更等級，不受考核通過與否影響；升等不增加退款、補償或其他操作權限。
 export const LEVELS = { 1: 'Lv.1 客服實習生', 2: 'Lv.2 客服助理', 3: 'Lv.3 客服專員' };
-export const DIFFICULTY_NAMES = { 1: '基礎', 2: '情境應用', 3: '綜合' };
+// 題目難度與考核等級對應：Lv.1 抽給基礎考核、Lv.2 抽給情境應用考核、Lv.3 抽給綜合考核
+export const DIFFICULTY_NAMES = { 1: 'Lv.1', 2: 'Lv.2', 3: 'Lv.3' };
 export function levelLabel(level) { return LEVELS[level] || '尚未設定到職日'; }
 
 export function stageShort(stage) {
