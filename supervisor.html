@@ -22,7 +22,7 @@
 import { requireRole } from './js/guard.js';
 import { renderNav, h, showError, setBusy } from './js/ui.js';
 import { select, rpc, callFn } from './js/api.js';
-import { stageShort, stageLabel, errorTypeCounts, dueStatus, createErrorLabel } from './js/format.js';
+import { stageShort, stageLabel, errorTypeCounts, dueStatus, createErrorLabel, levelLabel, DIFFICULTY_NAMES } from './js/format.js';
 import { parseRoster } from './js/roster.js';
 import { renderErrorBars } from './js/report.js';
 
@@ -32,7 +32,7 @@ const panel = document.getElementById('panel');
 const tabOverview = document.getElementById('tab-overview');
 const tabReview = document.getElementById('tab-review');
 const tabAdd = document.getElementById('tab-add');
-const STAGES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 10, 11];
+const STAGES = [12, 13, 14];
 
 function activate(which) {
   tabOverview.className = `btn ${which === 'overview' ? '' : 'ghost'}`;
@@ -51,16 +51,14 @@ async function showOverview() {
       select('profiles', { columns: 'id, name, role', order: ['name', 'asc'] }),
       select('v_stage_summary', { columns: 'user_id, stage, best_score, attempts, passed' }),
       select('v_error_counts', { columns: 'error_type, cnt' }),
-      select('v_assessment_status', { columns: 'user_id, hire_date, probation_due, probation_passed_at, semiannual_due' }),
+      select('v_exam_schedule', { columns: 'user_id, hire_date, due_1, due_3, due_6, level, passed_1, passed_2, passed_3' }),
     ]);
     const stat = new Map(statuses.map((s) => [s.user_id, s]));
     const dueCell = (uid) => {
       const s = stat.get(uid) || {};
-      const p = dueStatus(s.probation_due, !!s.probation_passed_at);
-      const a = dueStatus(s.semiannual_due, false);
-      return h('td', { class: 'due-col' },
-        h('div', { class: `due ${p.level}` }, `試用期：${p.label}`),
-        h('div', { class: `due ${a.level}` }, `半年：${a.label}`));
+      const lines = [['基礎', s.due_1, s.passed_1], ['情境', s.due_3, s.passed_2], ['綜合', s.due_6, s.passed_3]]
+        .map(([n, d, ok]) => { const x = dueStatus(d, !!ok); return h('div', { class: `due ${x.level}` }, `${n}：${x.label}`); });
+      return h('td', { class: 'due-col' }, h('div', { class: 'muted' }, levelLabel(s.level)), ...lines);
     };
     const employees = profiles.filter((p) => p.role === 'employee');
     const by = new Map(sums.map((s) => [`${s.user_id}:${s.stage}`, s]));
@@ -71,7 +69,7 @@ async function showOverview() {
         `${s.best_score} ${s.passed ? '✔' : '✘'}`);
     };
     panel.replaceChildren(
-      h('p', { class: 'muted' }, '格內為各階段最高分：✔ 已通過（80 分）、✘ 未通過、— 未考。點員工姓名看詳情。'),
+      h('p', { class: 'muted' }, '格內為各階段最高分：✔ 已通過（基礎 80／情境 85／綜合 90）、✘ 未通過、— 未考。點員工姓名看詳情。'),
       employees.length
         ? h('div', { class: 'matrix-wrap' }, h('table', { class: 'matrix' },
             h('thead', {}, h('tr', {}, h('th', {}, '員工'), ...STAGES.map((s) => h('th', { title: stageLabel(s) }, stageShort(s))), h('th', {}, '考核期限'))),
@@ -84,23 +82,38 @@ async function showOverview() {
   } catch (e) { showError(panel, e); }
 }
 
-async function showReview() {
+async function showReview(attemptId = null) {
   activate('review');
-  const selStage = h('select', { id: 'r-stage', 'aria-label': '階段' }, h('option', { value: '' }, '全部階段'),
+  const selStage = h('select', { id: 'r-stage', 'aria-label': '主題' }, h('option', { value: '' }, '全部主題'),
     ...[1, 2, 3, 4, 5, 6, 7, 8, 9].map((s) => h('option', { value: s }, stageLabel(s))));
+  const selDiff = h('select', { id: 'r-diff', 'aria-label': '難度' }, h('option', { value: '' }, '全部難度'),
+    ...[1, 2, 3].map((d) => h('option', { value: d }, DIFFICULTY_NAMES[d])));
+  const selState = h('select', { id: 'r-state', 'aria-label': '狀態' },
+    h('option', { value: 'pending' }, '待審核'), h('option', { value: 'approved' }, '已審核'), h('option', { value: 'removed' }, '已刪除'));
   const list = h('div', {});
   const msg = h('div', { 'aria-live': 'polite' });
-  const markBtn = h('button', { class: 'btn', id: 'mark-reviewed' }, '把勾選的標為已審核');
+  const markBtn = h('button', { class: 'btn', id: 'mark-reviewed' }, '勾選的標為已審核');
+  const delBtn = h('button', { class: 'btn ghost', id: 'remove-picked' }, '刪除勾選的題目');
   panel.replaceChildren(
-    h('p', { class: 'muted' }, '舊題庫是通用電商版本、標示「待主管審核」。確認題目與好物集 SOP 相符後再標為已審核；未審核的題目不會進入綜合適任考核。'),
-    h('div', { class: 'row' }, selStage, markBtn), msg, list);
+    h('p', { class: 'muted' }, attemptId
+      ? '這份考卷用到的題目。確認題目與答案符合好物集 SOP 就「通過」；不適合就「刪除」，刪除的題目不會再被抽進任何考試。'
+      : '新人每次考試都會抽到尚未審核的題目，請在考完後逐題確認：適合的標為已審核，不適合的刪除（刪除後不再被抽到，資料暫不歸檔，仍可在「已刪除」還原）。'),
+    attemptId ? h('p', {}, h('a', { href: 'supervisor.html', id: 'back-all' }, '← 回到全部題庫')) : h('div', { class: 'row' }, selStage, selDiff, selState),
+    h('div', { class: 'row' }, markBtn, delBtn), msg, list);
 
   const MAX = 100;
+  const stateOf = (q) => (q.removed ? 'removed' : q.reviewed ? 'approved' : 'pending');
   async function load() {
     setBusy(list);
     try {
-      const stage = selStage.value ? Number(selStage.value) : null;
-      const rows = await rpc('list_questions_for_review', { p_stage: stage, p_reviewed: false });
+      let rows;
+      if (attemptId) rows = await rpc('list_attempt_questions', { p_attempt: attemptId });
+      else {
+        const st = selState.value;
+        rows = await rpc('list_questions_for_review', {
+          p_stage: selStage.value ? Number(selStage.value) : null, p_reviewed: st === 'removed' ? null : st === 'approved',
+          p_difficulty: selDiff.value ? Number(selDiff.value) : null, p_removed: st === 'removed' });
+      }
       const shown = rows.slice(0, MAX);
       const all = h('input', { type: 'checkbox', 'aria-label': '全選', onchange: (ev) => list.querySelectorAll('input.pick').forEach((c) => (c.checked = ev.target.checked)) });
       const detail = (q) => h('details', {},
@@ -110,22 +123,44 @@ async function showReview() {
         q.reference_answer ? h('p', {}, `參考答案：${q.reference_answer}`) : null,
         q.rubric ? h('p', {}, `得分點：${q.rubric.join('；')}`) : null,
         q.explanation ? h('p', { class: 'muted' }, `解析：${q.explanation}`) : null);
+      const act = async (fn, ids, text) => {
+        try { const n = await rpc(fn, { p_ids: ids, ...(fn === 'set_reviewed' ? { p_reviewed: true } : {}) }); msg.replaceChildren(h('p', { class: 'notice ok' }, `${text} ${n} 題。`)); await load(); }
+        catch (e) { showError(msg, e); }
+      };
+      const stateLabel = { pending: '待審核', approved: '已審核', removed: '已刪除' };
       list.replaceChildren(
-        h('p', { class: 'muted' }, `未審核共 ${rows.length} 題${rows.length > MAX ? `，目前顯示前 ${MAX} 題（可用階段篩選縮小範圍）` : ''}。`),
+        h('p', { class: 'muted' }, `共 ${rows.length} 題${rows.length > MAX ? `，目前顯示前 ${MAX} 題（可用篩選縮小範圍）` : ''}。`),
         h('table', { class: 'review', 'data-stage': selStage.value },
-          h('thead', {}, h('tr', {}, h('th', {}, all), h('th', {}, '階段'), h('th', {}, '題型'), h('th', {}, '題目（點開看答案）'))),
+          h('thead', {}, h('tr', {}, h('th', {}, all), h('th', {}, '主題'), h('th', {}, '難度'), h('th', {}, '題型'), h('th', {}, '題目（點開看答案）'), h('th', {}, '狀態'), h('th', {}, '操作'))),
           h('tbody', {}, shown.map((q) => h('tr', { 'data-qid': q.id },
             h('td', {}, h('input', { type: 'checkbox', class: 'pick', 'data-qid': q.id, 'aria-label': `選取 ${q.id}` })),
-            h('td', {}, stageShort(q.stage)), h('td', {}, q.qtype === 'short' ? '情境簡答' : '選擇'), h('td', {}, detail(q)))))));
+            h('td', {}, stageShort(q.stage)), h('td', {}, DIFFICULTY_NAMES[q.difficulty] || '—'),
+            h('td', {}, q.qtype === 'short' ? '情境簡答' : '選擇'), h('td', {}, detail(q)), h('td', {}, stateLabel[stateOf(q)]),
+            h('td', {},
+              q.removed
+                ? h('button', { class: 'btn ghost restore-one', onclick: () => act('restore_questions', [q.id], '已還原') }, '還原')
+                : [q.reviewed ? null : h('button', { class: 'btn approve-one', onclick: () => act('set_reviewed', [q.id], '已標為已審核') }, '通過'),
+                   h('button', { class: 'btn ghost remove-one', onclick: () => { if (confirm('確定刪除這題？刪除後不會再被抽到。')) act('remove_questions', [q.id], '已刪除'); } }, '刪除')]))))));
     } catch (e) { showError(list, e); }
   }
-  selStage.addEventListener('change', load);
+  [selStage, selDiff, selState].forEach((el) => el.addEventListener('change', load));
+  const picked = () => [...list.querySelectorAll('input.pick:checked')].map((c) => c.dataset.qid);
   markBtn.addEventListener('click', async () => {
-    const ids = [...list.querySelectorAll('input.pick:checked')].map((c) => c.dataset.qid);
+    const ids = picked();
     if (!ids.length) { msg.replaceChildren(h('p', { class: 'notice warn' }, '請先勾選要標記的題目。')); return; }
     try {
       const n = await rpc('set_reviewed', { p_ids: ids, p_reviewed: true });
       msg.replaceChildren(h('p', { class: 'notice ok' }, `已將 ${n} 題標為已審核。`));
+      await load();
+    } catch (e) { showError(msg, e); }
+  });
+  delBtn.addEventListener('click', async () => {
+    const ids = picked();
+    if (!ids.length) { msg.replaceChildren(h('p', { class: 'notice warn' }, '請先勾選要刪除的題目。')); return; }
+    if (!confirm(`確定刪除 ${ids.length} 題？刪除後不會再被抽到。`)) return;
+    try {
+      const n = await rpc('remove_questions', { p_ids: ids });
+      msg.replaceChildren(h('p', { class: 'notice ok' }, `已刪除 ${n} 題。`));
       await load();
     } catch (e) { showError(msg, e); }
   });
@@ -180,8 +215,10 @@ async function showAdd() {
 
 tabAdd.addEventListener('click', showAdd);
 tabOverview.addEventListener('click', showOverview);
-tabReview.addEventListener('click', showReview);
-await showOverview();
+tabReview.addEventListener('click', () => showReview());
+const reviewParam = new URLSearchParams(location.search).get('review');
+if (reviewParam && /^[0-9a-f-]{36}$/i.test(reviewParam)) await showReview(reviewParam);
+else await showOverview();
 </script>
 </body>
 </html>

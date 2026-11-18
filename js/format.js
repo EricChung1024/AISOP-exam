@@ -12,12 +12,23 @@ export const STAGE_NAMES = {
   9: '第 9 章 工單與結案',
   10: '試用期考核',
   11: '半年考核',
+  12: '基礎考核（滿 1 個月）',
+  13: '情境應用考核（滿 3 個月）',
+  14: '綜合考核（滿 6 個月）',
 };
+
+// 到職後依年資自動變更等級，不受考核通過與否影響；升等不增加退款、補償或其他操作權限。
+export const LEVELS = { 1: 'Lv.1 客服實習生', 2: 'Lv.2 客服助理', 3: 'Lv.3 客服專員' };
+export const DIFFICULTY_NAMES = { 1: '基礎', 2: '情境應用', 3: '綜合' };
+export function levelLabel(level) { return LEVELS[level] || '尚未設定到職日'; }
 
 export function stageShort(stage) {
   if (stage === 0) return '綜合';
   if (stage === 10) return '試用期';
   if (stage === 11) return '半年';
+  if (stage === 12) return '基礎';
+  if (stage === 13) return '情境';
+  if (stage === 14) return '綜合（六月）';
   return `第 ${stage} 章`;
 }
 
@@ -48,13 +59,13 @@ export function esc(s) {
 }
 
 const MESSAGES = {
-  NO_QUESTIONS: '此階段尚無題目。',
+  NO_QUESTIONS: '此階段尚無可用題目，請通知主管補題。',
   NO_WRONG: '目前沒有可重練的錯題（情境簡答題請對照參考答案自行複習）。',
   ATTEMPT_CLOSED: '此份考卷已交出或已結束，無法再次提交。',
   NOT_AUTHENTICATED: '請先登入。',
   FORBIDDEN: '你沒有權限執行這個操作。',
   BAD_POINTS: '分數必須介於 0 到 1。',
-  BAD_STAGE: '階段不正確。',
+  BAD_STAGE: '這個考核階段不存在或已停用。',
   BAD_STATUS: '狀態不正確。',
   NOT_FOUND: '找不到對應的資料。',
   TOO_MANY: '一次最多建立 200 位員工。',

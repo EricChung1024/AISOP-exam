@@ -117,7 +117,7 @@ async function main() {
     app.replaceChildren(h('p', { class: 'notice warn' }, '自評資料已遺失，請重新參加考試。'), back);
     return;
   }
-  if (!Number.isInteger(stage) || stage < 0 || stage > 11) { app.replaceChildren(h('p', { class: 'notice error' }, '階段不正確。'), back); return; }
+  if (!Number.isInteger(stage) || stage < 12 || stage > 14) { app.replaceChildren(h('p', { class: 'notice error' }, '階段不正確。'), back); return; }
   setBusy(app, '正在抽題…');
   try { renderExam(await rpc('start_exam', { p_stage: stage })); }
   catch (e) { showError(app, e); app.append(back); }

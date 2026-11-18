@@ -18,7 +18,7 @@
 import { requireRole } from './js/guard.js';
 import { renderNav, h, showError, setBusy } from './js/ui.js';
 import { select, rpc, callFn } from './js/api.js';
-import { stageLabel, fmtDate, errorTypeCounts, dueStatus } from './js/format.js';
+import { stageLabel, fmtDate, errorTypeCounts, dueStatus, levelLabel } from './js/format.js';
 import { renderErrorBars } from './js/report.js';
 
 const me = await requireRole('supervisor');
@@ -35,11 +35,11 @@ async function load() {
       select('attempts', { columns: 'id, stage, score, passed, submitted_at', eq: { user_id: uid, status: 'done' }, order: ['submitted_at', 'desc'] }),
       select('v_error_counts', { columns: 'error_type, cnt', eq: { user_id: uid } }),
       rpc('get_employee_detail', { p_user: uid }),
-      select('v_assessment_status', { columns: 'hire_date, probation_due, probation_passed_at, semiannual_due', eq: { user_id: uid } }),
+      select('v_exam_schedule', { columns: 'hire_date, due_1, due_3, due_6, level, passed_1, passed_2, passed_3', eq: { user_id: uid } }),
     ]);
     const st = statusRows[0] || {};
-    const pDue = dueStatus(st.probation_due, !!st.probation_passed_at);
-    const sDue = dueStatus(st.semiannual_due, false);
+    const dues = [['基礎考核（滿 1 個月）', st.due_1, st.passed_1], ['情境應用考核（滿 3 個月）', st.due_3, st.passed_2], ['綜合考核（滿 6 個月）', st.due_6, st.passed_3]]
+      .map(([n, d, ok]) => ({ n, d, x: dueStatus(d, !!ok) }));
     const hire = h('input', { type: 'date', id: 'hire-date', value: st.hire_date || '', 'aria-label': '到職日', style: 'width:12rem' });
     const saveHire = h('button', { class: 'btn', id: 'save-hire', onclick: async () => {
       try {
@@ -70,9 +70,8 @@ async function load() {
       h('h2', {}, '到職日與考核期限'),
       h('div', { class: 'row' }, h('label', { for: 'hire-date', style: 'margin:0' }, '到職日'), hire, saveHire),
       h('div', { class: 'formal-status' },
-        h('p', { class: `due ${pDue.level}` }, `試用期考核：${pDue.label}`),
-        h('p', { class: `due ${sDue.level}` }, `半年考核：${sDue.label}`),
-        h('p', { class: 'muted' }, `期限日期：試用期 ${st.probation_due || '—'}（到職日＋3 個月）・半年考核 ${st.semiannual_due || '—'}`)),
+        ...dues.map((o) => h('p', { class: `due ${o.x.level}` }, `${o.n}：${o.x.label}`)),
+        h('p', { class: 'muted' }, `目前等級：${levelLabel(st.level)}（依年資自動變更，不受考核結果影響）`)),
       h('h2', {}, '帳號'),
       h('div', { class: 'row' }, h('button', { class: 'btn ghost', id: 'reset-pw', onclick: async () => {
         if (!confirm('確定要重設這位員工的密碼嗎？舊密碼會立刻失效。')) return;
@@ -84,10 +83,11 @@ async function load() {
       h('h2', {}, '歷次成績'),
       attempts.length
         ? h('table', { class: 'attempts' },
-            h('thead', {}, h('tr', {}, ['階段', '交卷時間', '分數', '結果'].map((t) => h('th', {}, t)))),
+            h('thead', {}, h('tr', {}, ['階段', '交卷時間', '分數', '結果', '題目審核'].map((t) => h('th', {}, t)))),
             h('tbody', {}, attempts.map((a) => h('tr', {},
               h('td', {}, stageLabel(a.stage)), h('td', {}, fmtDate(a.submitted_at)), h('td', {}, String(a.score)),
-              h('td', { class: a.passed ? 'cell-ok' : 'cell-bad' }, a.passed ? '已通過' : '未通過')))))
+              h('td', { class: a.passed ? 'cell-ok' : 'cell-bad' }, a.passed ? '已通過' : '未通過'),
+              h('td', {}, h('a', { class: 'review-link', href: `supervisor.html?review=${a.id}` }, '審核這份考卷的題目'))))))
         : h('p', { class: 'muted' }, '還沒有考試紀錄。'),
       h('h2', {}, '錯誤類型分布'),
       renderErrorBars(errorTypeCounts(errs)),
